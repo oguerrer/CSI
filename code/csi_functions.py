@@ -1,6 +1,6 @@
 """Climate Security Index Source Code - Helper Functions
 
-Authors: Omar A. Guerrero & Daniele Guariso
+Authors: Omar A Guerrero & Daniele Guariso
 Written in Python 3.7
 
 
@@ -32,6 +32,7 @@ Required external libraries
 import numpy as np
 import networkx as nx
 import scipy.stats as st
+import scipy.signal as ss
 import os, warnings
 warnings.simplefilter("ignore")
 
@@ -214,25 +215,21 @@ def get_synchronization(X):
     stds = np.tile(np.std(deltaX, axis=1), (deltaX.shape[1], 1)).T
     X_normed = (deltaX - means) / stds
 
-    # Compute the fast Fourier transform of the normalized time series
-    X_freq_domain = np.fft.fft(X_normed, axis=1)
-
-    # Compute the phase of the FFT components
-    X_phase = np.angle(X_freq_domain)
-
-    # Construct matrix with pairwise phase locking values (PLVs)
-    S = np.zeros((n,n))
+    # compute the phase locking values (PLVs)
+    S = np.zeros([n,n],dtype=float) # matrix that will store the pairwise values
+    data_points = X_normed.shape[-1]
+    data_hilbert = np.imag(ss.hilbert(X_normed)) # the Hilbert transformation extracts information on the phase of the time series
+    phase = np.arctan(data_hilbert/X_normed) # the instantaneous phase
+    
+    # fill the PLV matrix and renormalize units to be consisten with the other modules of the CSI (between -1 and 1)
     for i in range(n):
         for j in range(n):
-            phase_diff = X_phase[i] - X_phase[j]
-            plv = np.abs(np.mean(np.exp(1j * phase_diff)))
-            # we rescale the PLV to match the units of the other two components, so instead of being in (0,1), it is in (-1,1)
-            S[i,j] = (2 * plv) - 1
+            S[i,j] = (2 * np.abs(np.sum(np.exp(1j*(phase[i,:]-phase[j,:]))))/data_points) - 1
 
-    PLV = np.mean(S) # this is the average phase locking value for the entire system
+    SYNC = np.mean(S) # this is the average phase locking value for the entire system
     
     # return both the average phase locking value of the system as well as the matrix with the pairwise values
-    return PLV, S
+    return SYNC, S
 
 
 
@@ -304,12 +301,90 @@ def get_heavy_tailness(X, percentile, n_resamples):
 
 
 
+# CLIMATE SECURITY INDEX
+def compute_csi(EVs, IF, C, S):
+    
+    """
+    Function to compute the climate security index (CSI).
+
+    Parameters
+    ----------
+        EVs: numpy array
+            A vector with the module values for each type of extreme event.
+            
+        IF: float
+            The value for the institutional fragility module.
+            
+        C: float
+            The value for the connectivity module.
+            
+        S: float
+            The value for the synchronicity module.
+            
+
+    Returns
+    -------
+        CSI: float
+            The climate security index.
+
+    """
+    
+    # prepare the data 
+    modules_values = np.concatenate([EVs, [IF], [C], [S]])
+    
+    values = np.clip(modules_values, a_min=-1, a_max=None).tolist() # values below -1 should be clipped to properly define the polygons
+    angles = np.linspace(0, 2*np.pi, len(values), endpoint=False).tolist()
+    angles.append(angles[0])
+    values.append(values[0])
+    
+    # compute the area of the modules' polygon
+    theta = np.array(angles)
+    r = np.array(values)+1
+    x_cartesian = r * np.cos(theta)
+    y_cartesian = r * np.sin(theta)
+    coordinates_inner = np.array(list(zip(x_cartesian, y_cartesian)))
+    inner_polygon_area = polygon_area(coordinates_inner)
+    
+    # compute the area of the worst-possible polygon
+    r = 2*np.ones(len(angles))
+    x_cartesian_max = r * np.cos(theta)
+    y_cartesian_max = r * np.sin(theta)
+    coordinates_outer = np.array(list(zip(x_cartesian_max, y_cartesian_max)))
+    outer_polygon_area = polygon_area(coordinates_outer)
+    
+    # compute the climate security index
+    CSI = inner_polygon_area / outer_polygon_area
+    
+    return CSI
+    
 
 
 
 
+# HELPER FUNCTION TO CALCULATE POLYGON AREAS
+def polygon_area(vertices):
+    
+    """
+    A helper function that uses Shoelace formula to obtain the area of an
+    arbitrary polygon provided its Cartesian coordinates.
 
+    Parameters
+    ----------
+        vertices: 2D numpy array
+            A vector with (x,y) coordinates of each vertex of the polygon.
 
+    Returns
+    -------
+        area: float
+            The area of the polygon.
+
+    """
+    
+    a = np.vstack((vertices, vertices[0]))
+    S1 = sum(a[:-1,0] * a[1:,1])
+    S2 = sum(a[:-1,1] * a[1:,0])
+    area = abs(S1-S2)/2
+    return area
 
 
 
