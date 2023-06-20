@@ -3,4 +3,4 @@
 Authors: Omar A Guerrero and Daniele Guariso
 
 This is the repository of the Climate Security Index developed by CGIAR and The Alan Turing Institute.
-Full details on the CSI theory methodology and methodology can be found in its [Methodological Note](/CSI/blob/main/CSI.pdf).
+Full details on the CSI theory methodology and methodology can be found in its [Methodological Note](blob/main/CSI.pdf).
