@@ -11,3 +11,5 @@ The contents of this repository are organised as follows:
 * `code/csi_functions.py`: Contains all the necessary functions to compute the CSI and its different modules. It is loaded by the tutorial.
 * `code/example_data/`: an example dataset prepared for the case of Kenya.
 * `code/preprocessing_scripts/`: A folder with scripts that the user could use to prepare the data for the CSI, they include imputation, normalisation, reversion, and the estimation of the network of conditional dependencies.
+
+![CSI](concept_example_2.png)
